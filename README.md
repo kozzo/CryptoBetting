@@ -1,66 +1,54 @@
-## Foundry
+# CryptoBetting
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+## Overview
+CryptoBetting is a decentralized betting platform that allows users to place bets on the rise or fall of cryptocurrency prices using Chainlink Data Feeds for price validation.
 
-Foundry consists of:
+## Features
+- Secure and verifiable on-chain betting.
+- Uses Chainlink Price Feeds to determine outcomes.
+- Ensures fair payouts using Solidity best practices.
+- Optimized for gas efficiency and security.
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+## Installation
 
-## Documentation
+1. **Clone the repository**
+   ```sh
+   git clone https://github.com/kozzo/CryptoBetting.git
+   cd CryptoBetting
+   ```
 
-https://book.getfoundry.sh/
+2. **Install dependencies**
+   ```sh
+   forge install
+   ```
 
-## Usage
+3. **Run tests**
+   ```sh
+   forge test
+   ```
 
-### Build
+## Deployment
 
-```shell
-$ forge build
-```
+1. **Compile the contract**
+   ```sh
+   forge build
+   ```
 
-### Test
+2. **Deploy to a testnet (example: Sepolia)**
+   ```sh
+   forge create --rpc-url YOUR_RPC_URL --private-key YOUR_PRIVATE_KEY src/CryptoBetting.sol:CryptoBetting
+   ```
 
-```shell
-$ forge test
-```
+## Security Considerations
+- The contract uses `call{value: ...}('')` instead of `transfer()` to handle gas limits safely.
+- The betting logic is tested with Foundry.
+- Chainlink is used as a trusted oracle.
 
-### Format
+## Future Improvements
+- Implementing a frontend for user interaction.
+- Adding support for multiple cryptocurrencies.
+- Enabling a decentralized governance mechanism.
 
-```shell
-$ forge fmt
-```
+## License
+MIT License
 
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
