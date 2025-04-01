@@ -4,8 +4,7 @@ pragma solidity ^0.8.23;
 import "lib/chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 contract CryptoBetting {
-  AggregatorV3Interface internal constant priceFeed =
-    AggregatorV3Interface(0xe7656e23fE8077D438aEfbec2fAbDf2D8e070C4f);
+  AggregatorV3Interface public priceFeed;
 
   address public owner;
   uint256 public commissionRate = 5; // 5% commission
@@ -29,8 +28,15 @@ contract CryptoBetting {
   uint256 public totalRiseBets;
   uint256 public totalFallBets;
 
-  constructor() {
+  constructor(address _priceFeed) {
     owner = msg.sender;
+    priceFeed = AggregatorV3Interface(_priceFeed);
+  }
+
+  function setCommissionRate(uint256 _commissionRate) external {
+    require(msg.sender == owner, "Only owner can set commission rate");
+    require(_commissionRate <= 100, "Commission rate must be <= 100%");
+    commissionRate = _commissionRate;
   }
 
   function placeBet(Prediction _prediction) external payable {

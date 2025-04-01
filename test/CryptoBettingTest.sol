@@ -10,7 +10,7 @@ contract CryptoBettingTest is Test {
   address priceFeed = 0xe7656e23fE8077D438aEfbec2fAbDf2D8e070C4f;
 
   function setUp() public {
-    bettingContract = new CryptoBetting();
+    bettingContract = new CryptoBetting(0xe7656e23fE8077D438aEfbec2fAbDf2D8e070C4f);
   }
 
   function testPlaceBet() public {
