@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "../src/CryptoBetting.sol";
@@ -7,20 +7,20 @@ import "forge-std/console.sol";
 
 contract CryptoBettingTest is Test {
   CryptoBetting bettingContract;
-  address priceFeed = 0xe7656e23fE8077D438aEfbec2fAbDf2D8e070C4f; // Use a mock or a real Chainlink price feed
+  address priceFeed = 0xe7656e23fE8077D438aEfbec2fAbDf2D8e070C4f;
 
   function setUp() public {
     bettingContract = new CryptoBetting();
   }
 
   function testPlaceBet() public {
-    vm.deal(address(this), 1 ether); // Ensure we have ETH
+    vm.deal(address(this), 1 ether);
 
-    // Mock the Chainlink price feed response before placing a bet
+    // Mock Chainlink price feed response
     vm.mockCall(
       priceFeed,
       abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
-      abi.encode(0, 500000000000, 0, 0, 0) // Return BTC price of 50,000 USD
+      abi.encode(0, 500000000000, 0, 0, 0) // 50,000 USD
     );
 
     bettingContract.placeBet{ value: 0.1 ether }(CryptoBetting.Prediction.Rise);
@@ -31,16 +31,14 @@ contract CryptoBettingTest is Test {
     assertEq(amount, 0.1 ether);
     assertEq(uint256(prediction), uint256(CryptoBetting.Prediction.Rise));
     assertEq(claimed, false);
+    assertEq(entryPrice, 500000000000);
   }
 
   function testMockChainlinkPrice() public {
-    address chainlinkFeed = 0xe7656e23fE8077D438aEfbec2fAbDf2D8e070C4f;
-
-    // Mock the Chainlink price feed response
     vm.mockCall(
-      chainlinkFeed,
+      priceFeed,
       abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
-      abi.encode(0, 500000000000, 0, 0, 0) // Return BTC price of 50,000 USD
+      abi.encode(0, 500000000000, 0, 0, 0)
     );
 
     int256 price = bettingContract.getLatestPrice();
@@ -52,10 +50,12 @@ contract CryptoBettingTest is Test {
     // Ensure test accounts have ETH
     address user1 = address(1);
     address user2 = address(2);
+    address user3 = address(3);
     vm.deal(user1, 1 ether);
     vm.deal(user2, 1 ether);
+    vm.deal(user3, 1 ether);
 
-    // Mock the Chainlink price feed response
+    // Mock the Chainlink price feed response (initial price)
     vm.mockCall(
       priceFeed,
       abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
@@ -67,34 +67,39 @@ contract CryptoBettingTest is Test {
     bettingContract.placeBet{ value: 0.5 ether }(CryptoBetting.Prediction.Rise);
 
     vm.prank(user2);
+    bettingContract.placeBet{ value: 0.3 ether }(CryptoBetting.Prediction.Rise);
+
+    vm.prank(user3);
     bettingContract.placeBet{ value: 0.5 ether }(CryptoBetting.Prediction.Fall);
 
-    // Verify bets are stored
-    (uint256 amount1,, bool claimed1,) = bettingContract.bets(user1);
-    (uint256 amount2,, bool claimed2,) = bettingContract.bets(user2);
-    assertGt(amount1, 0, "User1 bet should be recorded");
-    assertGt(amount2, 0, "User2 bet should be recorded");
-    assertEq(claimed1, false);
-    assertEq(claimed2, false);
-
-    // Mock a new price feed response (simulate price change)
+    // Mock price increase (winners: user1, user2 | loser: user3)
     vm.mockCall(
       priceFeed,
       abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
       abi.encode(0, 510000000000, 0, 0, 0) // Price moves to 51,000 USD
     );
 
-    // Resolve bets as correct users
+    // Resolve bets
     vm.prank(user1);
     bettingContract.resolveBet();
 
     vm.prank(user2);
     bettingContract.resolveBet();
 
+    vm.prank(user3);
+    bettingContract.resolveBet(); // This should do nothing since user3 lost
+
     // Verify payouts
-    (,, bool claimedUser1,) = bettingContract.bets(user1);
-    assertEq(claimedUser1, true);
-    (,, bool claimedUser2,) = bettingContract.bets(user2);
-    assertEq(claimedUser2, true);
+    uint256 totalLosersPool = 0.5 ether;
+    uint256 commission = (totalLosersPool * 5) / 100;
+    uint256 distributedWinnings = totalLosersPool - commission; // 0.475 ETH
+
+    uint256 expectedPayout1 = 1 ether + (0.5 ether * distributedWinnings) / 0.8 ether;
+    uint256 expectedPayout2 = 1 ether + (0.3 ether * distributedWinnings) / 0.8 ether;
+    uint256 expectedPayout3 = 0.5 ether; // Loser had 1 ether, bets 0.5 ether, gets 0, ends up with 0.5 ether
+
+    assertApproxEqAbs(user1.balance, expectedPayout1, 0.0001 ether);
+    assertApproxEqAbs(user2.balance, expectedPayout2, 0.0001 ether);
+    assertApproxEqAbs(user3.balance, expectedPayout3, 0.0001 ether); // Loser gets 0
   }
 }

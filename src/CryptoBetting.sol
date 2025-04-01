@@ -8,7 +8,7 @@ contract CryptoBetting {
     AggregatorV3Interface(0xe7656e23fE8077D438aEfbec2fAbDf2D8e070C4f);
 
   address public owner;
-  uint256 public commissionRate = 5; // Commission rate: 5%
+  uint256 public commissionRate = 5; // 5% commission
 
   enum Prediction {
     Rise,
@@ -19,11 +19,15 @@ contract CryptoBetting {
     uint256 amount;
     Prediction prediction;
     bool claimed;
-    int256 entryPrice; // Store initial price
+    int256 entryPrice;
   }
 
+  address[] public bettors;
   mapping(address => Bet) public bets;
+
   uint256 public totalBetAmount;
+  uint256 public totalRiseBets;
+  uint256 public totalFallBets;
 
   constructor() {
     owner = msg.sender;
@@ -31,11 +35,18 @@ contract CryptoBetting {
 
   function placeBet(Prediction _prediction) external payable {
     require(msg.value > 0, "Bet amount must be greater than 0");
-    require(bets[msg.sender].amount == 0, "User has already placed a bet");
+    require(bets[msg.sender].amount == 0, "Already placed a bet");
 
-    int256 currentPrice = getLatestPrice(); // Store price at bet time
+    int256 currentPrice = getLatestPrice();
     bets[msg.sender] = Bet(msg.value, _prediction, false, currentPrice);
+    bettors.push(msg.sender);
     totalBetAmount += msg.value;
+
+    if (_prediction == Prediction.Rise) {
+      totalRiseBets += msg.value;
+    } else {
+      totalFallBets += msg.value;
+    }
   }
 
   function getLatestPrice() public view returns (int256) {
@@ -48,26 +59,36 @@ contract CryptoBetting {
     require(!bets[msg.sender].claimed, "Already claimed");
 
     int256 latestPrice = getLatestPrice();
-    int256 entryPrice = bets[msg.sender].entryPrice;
-    Prediction userPrediction = bets[msg.sender].prediction;
+    Prediction winningPrediction =
+      (latestPrice > bets[msg.sender].entryPrice) ? Prediction.Rise : Prediction.Fall;
 
-    bool winner = false;
-    if (
-      (userPrediction == Prediction.Rise && latestPrice > entryPrice)
-        || (userPrediction == Prediction.Fall && latestPrice < entryPrice)
-    ) {
-      winner = true;
-    }
+    uint256 totalWinnersPool =
+      (winningPrediction == Prediction.Rise) ? totalRiseBets : totalFallBets;
 
-    if (winner) {
-      uint256 payout = (totalBetAmount * (100 - commissionRate)) / 100;
+    uint256 totalLosersPool = totalBetAmount - totalWinnersPool;
 
-      // payable(msg.sender).transfer(payout);
+    require(totalWinnersPool > 0, "No winners, no payout");
+
+    if (bets[msg.sender].prediction == winningPrediction) {
+      uint256 userBet = bets[msg.sender].amount;
+
+      // Calculate proportional winnings (minus commission)
+      uint256 userWinnings = (userBet * totalLosersPool) / totalWinnersPool;
+      uint256 payout = userBet + (userWinnings * (100 - commissionRate)) / 100;
 
       (bool success,) = payable(msg.sender).call{ value: payout }("");
       require(success, "Transfer failed");
     }
 
     bets[msg.sender].claimed = true;
+  }
+
+  function withdrawCommission() external {
+    require(msg.sender == owner, "Only owner can withdraw");
+    uint256 commission = (totalBetAmount * commissionRate) / 100;
+    totalBetAmount -= commission;
+
+    (bool success,) = payable(owner).call{ value: commission }("");
+    require(success, "Transfer failed");
   }
 }
